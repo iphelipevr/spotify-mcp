@@ -13,6 +13,18 @@ from ..utils.uri_parser import parse_spotify_id
 logger = logging.getLogger(__name__)
 
 
+def _playlist_content_container(playlist: dict) -> dict:
+    """Return old (`tracks`) or Spotify Feb-2026 (`items`) playlist contents."""
+    return playlist.get("items") or playlist.get("tracks") or {}
+
+
+def _playlist_item_content(entry: dict) -> dict:
+    """Return content from old (`track`) or Feb-2026 (`item`) wrappers."""
+    if not isinstance(entry, dict):
+        return entry
+    return entry.get("item") or entry.get("track") or entry
+
+
 def register(mcp):
 
     @mcp.tool()
@@ -37,14 +49,15 @@ def register(mcp):
 
         lines = [format_playlist_summary(playlist), ""]
 
-        # Show tracks
-        tracks = playlist.get("tracks", {}).get("items", [])
-        total = playlist.get("tracks", {}).get("total", 0)
+        # Spotify renamed the playlist `tracks` container to `items` in Feb 2026.
+        container = _playlist_content_container(playlist)
+        tracks = container.get("items", [])
+        total = container.get("total", 0)
 
-        # Calculate total duration
+        # Calculate total duration for either `track` (legacy) or `item` wrappers.
         total_ms = sum(
-            t.get("track", {}).get("duration_ms", 0)
-            for t in tracks if t.get("track")
+            (_playlist_item_content(t) or {}).get("duration_ms", 0)
+            for t in tracks
         )
         lines.append(f"**Duration:** {ms_to_duration(total_ms)} (first {len(tracks)} tracks)")
         lines.append("")
