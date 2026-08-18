@@ -3,6 +3,18 @@
 from ..config import MAX_DISPLAY_ITEMS
 
 
+def _playlist_item_content(entry: dict) -> dict:
+    """Return media content from old (`track`) or 2026 (`item`) playlist wrappers."""
+    if not isinstance(entry, dict):
+        return entry
+    return entry.get("item") or entry.get("track") or entry
+
+
+def _playlist_items_container(playlist: dict) -> dict:
+    """Return the playlist contents container for old or 2026 Spotify schemas."""
+    return playlist.get("items") or playlist.get("tracks") or {}
+
+
 def format_track(track: dict, index: int = None) -> str:
     """Format a single track as a markdown line."""
     if not track:
@@ -31,8 +43,8 @@ def format_track_list(tracks: list, numbered: bool = True) -> str:
     display = tracks[:MAX_DISPLAY_ITEMS]
     lines = []
     for i, t in enumerate(display, 1):
-        # Handle both raw track objects and playlist item wrappers
-        track = t.get("track", t) if isinstance(t, dict) else t
+        # Spotify renamed playlist wrapper `track` -> `item` in Feb 2026.
+        track = _playlist_item_content(t)
         idx = i if numbered else None
         lines.append(format_track(track, index=idx))
 
@@ -77,7 +89,7 @@ def format_playlist_summary(playlist: dict) -> str:
     """Format a playlist summary as markdown."""
     name = playlist.get("name", "Unknown")
     owner = playlist.get("owner", {}).get("display_name", "Unknown")
-    total = playlist.get("tracks", {}).get("total", 0)
+    total = _playlist_items_container(playlist).get("total", 0)
     public = "Public" if playlist.get("public") else "Private"
     desc = playlist.get("description", "")
     pid = playlist.get("id", "")
@@ -99,7 +111,7 @@ def format_playlist_list(playlists: list) -> str:
     lines = []
     for i, p in enumerate(playlists[:MAX_DISPLAY_ITEMS], 1):
         name = p.get("name", "Unknown")
-        total = p.get("tracks", {}).get("total", 0)
+        total = _playlist_items_container(p).get("total", 0)
         public = "Public" if p.get("public") else "Private"
         lines.append(f"{i}. **{name}** — {total} tracks ({public}) | ID: `{p.get('id', '')}`")
 
@@ -221,7 +233,7 @@ def format_time_distribution(hour_counts: dict) -> str:
             bar_len = int((count / max_count) * 20)
         else:
             bar_len = 0
-        bar = "\u2588" * bar_len
+        bar = "█" * bar_len
         lines.append(f"{hour:02d}:00  {bar}  ({count})")
     return "\n".join(lines)
 
@@ -237,6 +249,6 @@ def format_genre_chart(genre_counts: dict, limit: int = 15) -> str:
             bar_len = int((count / max_count) * 20)
         else:
             bar_len = 0
-        bar = "\u2588" * bar_len
+        bar = "█" * bar_len
         lines.append(f"{rank}. {genre}  {bar}  ({count})")
     return "\n".join(lines)
