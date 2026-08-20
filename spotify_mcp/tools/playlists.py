@@ -29,15 +29,28 @@ def register(mcp):
 
     @mcp.tool()
     @catch_spotify_errors
-    def spotify_get_my_playlists(limit: int = 50) -> str:
-        """List your playlists (up to 50)."""
+    def spotify_get_my_playlists(limit: int = 50, offset: int = 0) -> str:
+        """List your playlists with pagination."""
         limit = max(1, min(50, limit))
+        offset = max(0, offset)
+
         sp = get_client()
-        results = sp.current_user_playlists(limit=limit)
+        results = sp.current_user_playlists(
+            limit=limit,
+            offset=offset,
+        )
+
         playlists = results.get("items", [])
         total = results.get("total", 0)
 
-        header = f"**Your Playlists** ({total} total):\n\n"
+        start = offset + 1 if playlists else 0
+        end = offset + len(playlists)
+
+        header = (
+            f"**Your Playlists** ({total} total)\n"
+            f"**Showing {start}–{end}**\n\n"
+        )
+
         return header + format_playlist_list(playlists)
 
     @mcp.tool()
