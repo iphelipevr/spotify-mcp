@@ -1,5 +1,7 @@
 """Markdown response formatters for Claude."""
 
+import json
+
 from ..config import MAX_DISPLAY_ITEMS
 
 
@@ -47,6 +49,56 @@ def format_track_list(tracks: list, numbered: bool = True) -> str:
         track = _playlist_item_content(t)
         idx = i if numbered else None
         lines.append(format_track(track, index=idx))
+
+    result = "\n".join(lines)
+    if total > MAX_DISPLAY_ITEMS:
+        result += f"\n\n_Showing {MAX_DISPLAY_ITEMS} of {total} tracks._"
+    return result
+
+
+def format_playlist_item_list(items: list, position_offset: int = 0) -> str:
+    """Format playlist items without discarding item-level metadata.
+
+    The familiar human-readable track line is kept for backwards compatibility.
+    A second, machine-readable JSON line contains the zero-based playlist
+    position plus metadata that Spotify actually included in its response.
+    """
+    if not items:
+        return "_No tracks found._"
+
+    total = len(items)
+    display = items[:MAX_DISPLAY_ITEMS]
+    lines = []
+    for index, entry in enumerate(display):
+        track = _playlist_item_content(entry) or {}
+        position = position_offset + index
+        lines.append(format_track(track, index=position + 1))
+
+        metadata = {"position": position}
+        for key in ("id", "uri", "type"):
+            if key in track:
+                metadata[f"track.{key}"] = track[key]
+        for key in ("added_at", "is_local"):
+            if isinstance(entry, dict) and key in entry:
+                metadata[key] = entry[key]
+        for key in ("added_by",):
+            value = entry.get(key) if isinstance(entry, dict) else None
+            if isinstance(value, dict):
+                metadata[key] = {
+                    field: value[field] for field in ("id", "uri") if field in value
+                }
+        linked_from = track.get("linked_from")
+        if isinstance(linked_from, dict):
+            metadata["linked_from"] = {
+                field: linked_from[field]
+                for field in ("id", "uri")
+                if field in linked_from
+            }
+
+        lines.append(
+            "   `playlist_item`: "
+            + json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))
+        )
 
     result = "\n".join(lines)
     if total > MAX_DISPLAY_ITEMS:

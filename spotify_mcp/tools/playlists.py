@@ -5,7 +5,7 @@ from ..utils.spotify_client import get_client
 from ..utils.errors import catch_spotify_errors
 from ..utils.formatting import (
     format_playlist_summary, format_playlist_list,
-    format_track_list, ms_to_duration,
+    format_track_list, format_playlist_item_list, ms_to_duration,
 )
 from ..utils.pagination import fetch_all_playlist_items
 from ..utils.uri_parser import parse_spotify_id
@@ -96,7 +96,7 @@ def register(mcp):
         total = results.get("total", 0)
 
         header = f"**Tracks {offset + 1}–{offset + len(tracks)}** of {total}:\n\n"
-        return header + format_track_list(tracks)
+        return header + format_playlist_item_list(tracks, position_offset=offset)
 
     @mcp.tool()
     @catch_spotify_errors
