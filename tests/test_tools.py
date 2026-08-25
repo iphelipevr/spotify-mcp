@@ -465,6 +465,67 @@ class TestSpotifyGetPlaylist:
 
 
 # ===========================================================================
+# 6b. spotify_get_playlist_tracks (tools/playlists.py)
+# ===========================================================================
+
+
+class TestSpotifyGetPlaylistTracks:
+
+    def test_preserves_playlist_item_metadata(self, tool_registry, mock_sp):
+        track = _make_track(name="Relinked Song", track_id="playable-id")
+        track["type"] = "track"
+        track["linked_from"] = {
+            "id": "original-id",
+            "uri": "spotify:track:original-id",
+        }
+        mock_sp.playlist_items.return_value = {
+            "items": [{
+                "track": track,
+                "added_at": "2024-02-03T04:05:06Z",
+                "added_by": {
+                    "id": "user-123",
+                    "uri": "spotify:user:user-123",
+                    "display_name": "Not serialized",
+                },
+                "is_local": False,
+            }],
+            "total": 101,
+        }
+
+        result = tool_registry["spotify_get_playlist_tracks"](
+            playlist_id="pl123", limit=1, offset=100
+        )
+
+        assert "Relinked Song" in result
+        assert '"position":100' in result
+        assert '"track.id":"playable-id"' in result
+        assert '"track.uri":"spotify:track:6rqhFgbbKwnb9MLmUQDhG6"' in result
+        assert '"track.type":"track"' in result
+        assert '"added_at":"2024-02-03T04:05:06Z"' in result
+        assert '"added_by":{"id":"user-123","uri":"spotify:user:user-123"}' in result
+        assert '"is_local":false' in result
+        assert '"linked_from":{"id":"original-id","uri":"spotify:track:original-id"}' in result
+        assert "Not serialized" not in result
+
+    def test_supports_new_item_wrapper_and_missing_optional_metadata(
+        self, tool_registry, mock_sp
+    ):
+        track = _make_track(name="New Schema Song")
+        mock_sp.playlist_items.return_value = {
+            "items": [{"item": track}],
+            "total": 1,
+        }
+
+        result = tool_registry["spotify_get_playlist_tracks"](playlist_id="pl123")
+
+        assert "New Schema Song" in result
+        assert '"position":0' in result
+        assert '"track.id":"6rqhFgbbKwnb9MLmUQDhG6"' in result
+        assert "added_at" not in result
+        assert "linked_from" not in result
+
+
+# ===========================================================================
 # 7. spotify_create_playlist (tools/playlists.py)
 # ===========================================================================
 
